@@ -21,10 +21,49 @@ Data Structures:
 
 class MessierDataIngester:
     """Class to ingest Messier catalog data from an API and parse it for analysis."""
-    def fetch_and_save(self):
-        """Download Messier catalog and save to local CSV file."""
-        pass
+    import requests
+    import csv
+    import os
+    from constants import CSV_URL, CSV_FILENAME, LOG_FILENAME
 
-    def parse_messier_objects_to_dict(self):
-        """Read CSV and return list of dictionaries for each Messier object."""
-        pass
+    def fetch_and_save(self, url=CSV_URL, filename=CSV_FILENAME):
+        """
+        Download Messier catalog from a public CSV URL and save to local CSV file.
+        Args:
+            url (str): URL to the Messier catalog CSV.
+            filename (str): Local filename to save CSV.
+        Returns:
+            str: Path to saved CSV file.
+        """
+        response = self.requests.get(url)
+        response.raise_for_status()
+        with open(filename, "wb") as f:
+            f.write(response.content)
+        return filename
+
+    def parse_messier_objects_to_dict(self, filename=CSV_FILENAME):
+        """
+        Read CSV and return list of dictionaries for each Messier object.
+        Args:
+            filename (str): Path to CSV file.
+        Returns:
+            list[dict]: List of Messier object dictionaries.
+        """
+        objects = []
+        with open(filename, "r", encoding="utf-8") as f:
+            reader = self.csv.DictReader(f)
+            for row in reader:
+                objects.append(dict(row))
+        return objects
+
+    def log_objects_to_txt(self, objects, log_filename=LOG_FILENAME):
+        """
+        Log Messier objects to a text file for validation.
+        Args:
+            objects (list[dict]): List of Messier object dictionaries.
+            log_filename (str): Path to log file.
+        """
+        with open(log_filename, "w", encoding="utf-8") as f:
+            f.write("Logging Objects: \n")
+            for obj in objects:
+                f.write(str(obj) + "\n")

@@ -12,6 +12,10 @@ env/
 .venv/
 .tox/
 
+# Project specific ignore
+*.csv
+*log.txt
+
 # Streamlit specific ignores
 .streamlit/secrets.toml
 streamlit-storage/

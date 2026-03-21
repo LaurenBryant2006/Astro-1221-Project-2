@@ -44,16 +44,21 @@ class MessierDataIngester:
     def parse_messier_objects_to_dict(self, filename=CSV_FILENAME):
         """
         Read CSV and return list of dictionaries for each Messier object.
+        Skips comment lines and handles non-UTF-8 encoding.
         Args:
             filename (str): Path to CSV file.
         Returns:
             list[dict]: List of Messier object dictionaries.
         """
+        import csv
         objects = []
-        with open(filename, "r", encoding="utf-8") as f:
-            reader = self.csv.DictReader(f)
-            for row in reader:
-                objects.append(dict(row))
+        with open(filename, "r", encoding="latin1") as f:
+            # Skip comment lines (start with ';')
+            lines = [line for line in f if not line.strip().startswith(';') and line.strip()]
+        # Use csv.DictReader on filtered lines
+        reader = csv.DictReader(lines)
+        for row in reader:
+            objects.append(dict(row))
         return objects
 
     def log_objects_to_txt(self, objects, log_filename=LOG_FILENAME):

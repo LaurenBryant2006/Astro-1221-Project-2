@@ -47,9 +47,8 @@ Classes:
   - display_start_chart() - uses matplotlib to plot the objects from the analytics engine
   - chat_interface() - the textbox that talks to the LLM manager to handle user input
 
-
 ## Other Documentation To-Do:
- - Add AI usage to readme 
+ - Add AI usage to readme  (USED FOR DOCUMENTATION, boiler plate skeleton coding based on my architecture (busywork))
  - Provide script or command to run or function that shows every markdown comment (//) and prints them using regex into a txt file for grading purposes 
- - Requirements.txt file
+ - Requirements.txt file (also list of extra files like the constants file)
  - Dependencies and usagee/installation guide and everything.

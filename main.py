@@ -1,11 +1,5 @@
 """
-main.py
--------
 Entry point for the Messier Object Tourist Guide app.
-
-- Loads data using MessierDataIngester
-- Initializes analytics engine and user profile
-- Optionally launches Streamlit UI
 """
 
 from messier_data_ingester import MessierDataIngester
@@ -28,7 +22,7 @@ def main():
     analytics = AstroAnalyticsEngine(objects)
     analytics.clean_data()
 
-    # Test with default aperture (114mm)
+    # Test with default aperture
     filtered_df_default = analytics.filter_by_aperture_and_brightness()
     analytics.log_filtered_objects(
         filtered_df_default, 
@@ -36,7 +30,7 @@ def main():
     )
     print(f"Default Aperture ({DEFAULT_APERTURE_MM}mm): {len(filtered_df_default)} objects found.")
 
-    # Test with custom aperture
+    # Test with custom aperture, just check the created file and associated logs
     custom_aperture = 10
     filtered_df_custom = analytics.filter_by_aperture_and_brightness(custom_aperture)
     analytics.log_filtered_objects(
@@ -46,12 +40,8 @@ def main():
     print(f"Custom Aperture ({custom_aperture}mm): {len(filtered_df_custom)} objects found.")
 
     # 3. Load or create user profile (to be implemented)
-    # 4. (Optional) Launch Streamlit UI (to be implemented)
-
-
-    # 2. Initialize analytics engine (to be implemented)
-    # 3. Load or create user profile (to be implemented)
-    # 4. (Optional) Launch Streamlit UI (to be implemented)
+    # 4. Launch the LLM class to be used by Streamlit UI (to be implemented)
+    # 5. Launch Streamlit UI (to be implemented)
 
 if __name__ == "__main__":
     main()

@@ -1,3 +1,8 @@
+"""
+Centralized constants for the project
+"""
+
+# -------------- Astronomical calculation constants --------------
 # RA ranges best viewed at midnight during these seasons -> See this source https://in-the-sky.org/data/ra_season.php?town=4509177
 # Taking Fall as an example: The source states that the RAs of 0-6 are best for Sep to Oct to Nov, so we set that range there
 SEASON_RA = {
@@ -22,13 +27,28 @@ MONTH_MAP = {
     10: "July",
     11: "August"
 }
-"""
-constants.py
-------------
-Centralized constants for the project
-"""
+# RA bounds and mapping
+RA_MIN_HOUR = 0
+RA_MAX_HOUR = 24
+MONTHS_IN_YEAR = 12
 
-#CSV_URL = "https://raw.githubusercontent.com/masterhit/CeuProfundo/master/MessierObjects.csv"
+# Each month represents this many RA hours (24 / 12 = 2)
+RA_TO_MONTH_BUCKET_SIZE = RA_MAX_HOUR / MONTHS_IN_YEAR
+
+# Formula for limiting magnitude calculation:: m = 2.7 + 5 * log10(D)
+MAG_BASE_CONSTANT = 2.7
+MAG_LOG_COEFFICIENT = 5
+
+# How much brighter than viewing tool limit -> Grabbed from this source:  http://www.icq.eps.harvard.edu/MagScale.html 
+NAKED_EYE_BRIGHT_URBAN_VISIBILITY_THRESHOLD = 3.0
+NAKED_EYE_SUBURBAN_RURAL_DARK_VISIBILITY_THRESHOLD = 5.0
+BINOCULAR_VISIBILITY_THRESHOLD = 8.5
+
+# Default telescope aperture (mm)
+DEFAULT_APERTURE_MM = 114
+
+
+# -------------- Messier Catalog Constants --------------
 CSV_URL = "https://raw.githubusercontent.com/7468696e6b/fourmilab-hplanet/master/Messier.csv"
 CSV_FILENAME = "messier_catalog.csv"
 LOG_FILENAME = "messier_objects_log.txt"
@@ -46,6 +66,3 @@ COLUMNS = {
     'BURNHAM': 'Burnham',
     'REMARKS': 'Remarks',
 }
-
-# Default telescope aperture (mm)
-DEFAULT_APERTURE_MM = 114

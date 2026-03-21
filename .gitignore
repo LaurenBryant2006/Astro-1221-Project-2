@@ -15,6 +15,7 @@ env/
 # Project specific ignore
 *.csv
 *log.txt
+*aperture.txt
 
 # Streamlit specific ignores
 .streamlit/secrets.toml

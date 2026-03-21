@@ -59,7 +59,10 @@ DEFAULT_APERTURE_MM = 114
 # -------------- Messier Catalog Constants --------------
 CSV_URL = "https://raw.githubusercontent.com/7468696e6b/fourmilab-hplanet/master/Messier.csv"
 CSV_FILENAME = "messier_catalog.csv"
-LOG_FILENAME = "messier_objects_log.txt"
+LOG_FILENAME = "logged_objects_for_grading/messier_objects_log.txt"
+DEFAULT_APERTURE_LOG_FILENAME = "logged_objects_for_grading/filtered_objects_default_aperture.txt"
+CUSTOM_APERTURE_LOG_FILENAME = "logged_objects_for_grading/filtered_objects_custom_aperture.txt"
+
 
 # Column names for Messier catalog CSV
 COLUMNS = {

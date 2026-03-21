@@ -3,7 +3,7 @@ Entry point for the Messier Object Tourist Guide app.
 """
 
 from messier_data_ingester import MessierDataIngester
-from constants import CSV_FILENAME, LOG_FILENAME, DEFAULT_APERTURE_MM
+from constants import CSV_FILENAME, LOG_FILENAME, DEFAULT_APERTURE_MM, DEFAULT_APERTURE_LOG_FILENAME, CUSTOM_APERTURE_LOG_FILENAME
 from astro_analytics_engine import AstroAnalyticsEngine
 # from user_profile import UserProfile
 # from astro_llm_tools import AstroLLMTools
@@ -26,7 +26,7 @@ def main():
     filtered_df_default = analytics.filter_by_aperture_and_brightness()
     analytics.log_filtered_objects(
         filtered_df_default, 
-        log_filename="filtered_objects_default_aperture.txt"
+        log_filename=DEFAULT_APERTURE_LOG_FILENAME
     )
     print(f"Default Aperture ({DEFAULT_APERTURE_MM}mm): {len(filtered_df_default)} objects found.")
 
@@ -35,7 +35,7 @@ def main():
     filtered_df_custom = analytics.filter_by_aperture_and_brightness(custom_aperture)
     analytics.log_filtered_objects(
         filtered_df_custom, 
-        log_filename="filtered_objects_custom_aperture.txt"
+        log_filename=CUSTOM_APERTURE_LOG_FILENAME
     )
     print(f"Custom Aperture ({custom_aperture}mm): {len(filtered_df_custom)} objects found.")
 

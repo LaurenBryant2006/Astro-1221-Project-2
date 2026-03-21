@@ -47,8 +47,15 @@ Classes:
   - display_start_chart() - uses matplotlib to plot the objects from the analytics engine
   - chat_interface() - the textbox that talks to the LLM manager to handle user input
 
-## Other Documentation To-Do:
+## Other To-Do:
  - Add AI usage to readme  (USED FOR DOCUMENTATION, boiler plate skeleton coding based on my architecture (busywork))
- - Provide script or command to run or function that shows every markdown comment (//) and prints them using regex into a txt file for grading purposes 
+ - Provide script or command to run or function that shows every markdown comment (//) and prints them using regex into a txt file for grading purposes and also demonstrate meaningful code (code that isn't surrounded by comments, etc.)
  - Requirements.txt file (also list of extra files like the constants file)
- - Dependencies and usagee/installation guide and everything.
+ - Dependencies and usagee/installation guide and everything. Know which "pip" installs to add (pip install pandas, pip install numpy)
+ - need to add more try catch statements across the board
+
+
+-Magscale source: http://www.icq.eps.harvard.edu/MagScale.html 
+
+
+# NEXT STEP WHEN LOGGING ON IS TO CLEAN UP THE ASTRO ANALYTICS ENGINE TO MAKE SURE THE SCIENCE IS CORRECT, THEN CLEAN UP THE CODE TOO!!!

@@ -36,8 +36,8 @@ def main():
     )
     print(f"Default Aperture ({DEFAULT_APERTURE_MM}mm): {len(filtered_df_default)} objects found.")
 
-    # Test with custom aperture (300mm / Large Dobsonian)
-    custom_aperture = 300
+    # Test with custom aperture
+    custom_aperture = 10
     filtered_df_custom = analytics.filter_by_aperture_and_brightness(custom_aperture)
     analytics.log_filtered_objects(
         filtered_df_custom, 

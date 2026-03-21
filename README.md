@@ -2,6 +2,7 @@
 
 Architecture:
  - The following classes will all be levereged by the main.py file as our main top-down workflow! The goal of using this lead class was to develop incrementally so each class can work on its own and be tested in isolation! 
+ - # The documentation here serves as proof of our original pseudocode and planning, but the actual implementation is the real source of truth for function names/parameters etc. The goal of the classes and overall purpose remains the same!
 Classes:
 1) MessierDataIngester class 
 - Data Structures: 
@@ -53,9 +54,3 @@ Classes:
  - Requirements.txt file (also list of extra files like the constants file)
  - Dependencies and usagee/installation guide and everything. Know which "pip" installs to add (pip install pandas, pip install numpy)
  - need to add more try catch statements across the board
-
-
--Magscale source: http://www.icq.eps.harvard.edu/MagScale.html 
-
-
-# NEXT STEP WHEN LOGGING ON IS TO CLEAN UP THE ASTRO ANALYTICS ENGINE TO MAKE SURE THE SCIENCE IS CORRECT, THEN CLEAN UP THE CODE TOO!!!

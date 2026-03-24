@@ -20,12 +20,14 @@ Methods:
  
 Provides:
     - Sidebar for user profile settings (aperture, location, experience, season)
-    - Finder chart (Matplotlib scatter plot of Messier objects by RA/magnitude)
+    - Polar sky chart (Matplotlib polar plot of Messier objects by RA/Dec)
+    - Scatter finder chart (RA vs Magnitude)
     - Filterable data table of Messier objects
+    - Object detail cards with full stats
+    - Observation log to track observed objects with dates and notes
     - Favorites management
     - Chat interface placeholder (for LLM tools integration)
 """
- 
 import streamlit as st
 import matplotlib.pyplot as plt
 import matplotlib.patches as mpatches
@@ -127,16 +129,20 @@ def render_sidebar(profile, analytics):
     if location != profile.get_preference("location"):
         profile.update_preferences("location", location)
  
-    # Aperture
+    # Aperture — use a key so Streamlit manages the state directly
+    if "aperture_input" not in st.session_state:
+        st.session_state.aperture_input = float(
+            profile.get_preference("aperture_mm") or DEFAULT_APERTURE_MM
+        )
+ 
     aperture = st.sidebar.number_input(
         "Telescope Aperture (mm)",
         min_value=1.0,
         max_value=1000.0,
-        value=float(profile.get_preference("aperture_mm") or DEFAULT_APERTURE_MM),
         step=1.0,
+        key="aperture_input",
     )
-    if aperture != profile.get_preference("aperture_mm"):
-        profile.update_preferences("aperture_mm", aperture)
+    profile.update_preferences("aperture_mm", aperture)
  
     # Experience Level
     current_level = profile.get_preference("experience_level") or "Beginner"
@@ -181,6 +187,38 @@ def render_sidebar(profile, analytics):
     st.sidebar.divider()
     st.sidebar.caption(str(profile))
  
+    # Reset section
+    st.sidebar.divider()
+    with st.sidebar.expander("Reset Data"):
+        st.caption("Clear all personal data so a new observer can start fresh.")
+        if st.button("Reset All Data", type="secondary"):
+            st.session_state.confirm_reset = True
+ 
+        if st.session_state.get("confirm_reset", False):
+            st.warning("This will erase your profile, favorites, observation log, and all saved data.")
+            col1, col2 = st.columns(2)
+            with col1:
+                if st.button("Yes, reset everything", type="primary"):
+                    # Reset profile
+                    profile.reset_to_defaults()
+                    if os.path.exists(profile.profile_path):
+                        os.remove(profile.profile_path)
+ 
+                    # Reset observation log
+                    if os.path.exists(OBSERVATION_LOG_FILE):
+                        os.remove(OBSERVATION_LOG_FILE)
+                    st.session_state.obs_log = {}
+ 
+                    # Clear session state
+                    for key in list(st.session_state.keys()):
+                        del st.session_state[key]
+ 
+                    st.rerun()
+            with col2:
+                if st.button("Cancel"):
+                    st.session_state.confirm_reset = False
+                    st.rerun()
+ 
     return profile
  
  
@@ -204,14 +242,21 @@ def display_polar_chart(analytics, profile):
     season = profile.get_preference("preferred_season") or "Spring"
     mag_col = analytics.columns['MAGNITUDE']
     name_col = analytics.columns['NAME']
+    mag_limit = analytics.aperture_mag_limit(aperture)
  
     # Filter controls
-    col1, col2 = st.columns(2)
+    col1, col2, col3 = st.columns(3)
     with col1:
         show_season_only = st.checkbox(
             f"Show only {season} objects", value=False, key="polar_season"
         )
     with col2:
+        color_mode = st.selectbox(
+            "Color by",
+            ["Object Type", "Viewing Difficulty"],
+            key="polar_color",
+        )
+    with col3:
         show_visible_only = st.checkbox(
             "Show only visible with my telescope", value=False, key="polar_visible"
         )
@@ -225,6 +270,13 @@ def display_polar_chart(analytics, profile):
     if show_visible_only:
         visible = analytics.filter_by_aperture_and_brightness(aperture)
         df = df[df.index.isin(visible.index)]
+        total_visible = len(visible)
+        if total_visible == 110:
+            st.info(
+                f"All 110 Messier objects are visible with your {aperture:.0f}mm "
+                f"telescope (limiting mag {mag_limit:.1f}). Try a smaller aperture "
+                f"in the sidebar to see the filter in action."
+            )
  
     plot_df = df.dropna(subset=['RA_Decimal', mag_col]).copy()
  
@@ -261,14 +313,57 @@ def display_polar_chart(analytics, profile):
             0, 12, alpha=0.1, color="#1D9E75",
         )
  
-    # Plot objects by type
-    for obj_type, color in TYPE_COLORS.items():
-        mask = plot_df['NormalizedType'] == obj_type
-        if not mask.any():
-            continue
+    # Magnitude limit circle
+    limit_theta = np.linspace(0, 2 * np.pi, 100)
+    ax.plot(limit_theta, [mag_limit] * 100, color="#D85A30",
+            linestyle="--", alpha=0.5, linewidth=1, label=f"Scope limit ({mag_limit:.1f})")
  
-        sizes = plot_df.loc[mask, 'ApparentSizeAvg'].fillna(3).clip(lower=1)
-        sizes = (sizes / sizes.max()) * 150 + 25
+    # Difficulty color map
+    DIFFICULTY_COLORS = {
+        "Naked Eye": "#FCDE5A",
+        "Binoculars": "#5DCAA5",
+        "Telescope": "#7F77DD",
+        "Challenging": "#D85A30",
+    }
+ 
+    def get_difficulty(mag_val):
+        if mag_val <= 5.0:
+            return "Naked Eye"
+        elif mag_val <= 8.5:
+            return "Binoculars"
+        elif mag_val <= mag_limit - 1.0:
+            return "Telescope"
+        else:
+            return "Challenging"
+ 
+    if color_mode == "Viewing Difficulty":
+        plot_df['Difficulty'] = plot_df[mag_col].apply(get_difficulty)
+        for diff, color in DIFFICULTY_COLORS.items():
+            mask = plot_df['Difficulty'] == diff
+            if not mask.any():
+                continue
+            sizes = plot_df.loc[mask, 'ApparentSizeAvg'].fillna(3).clip(lower=1)
+            sizes = (sizes / sizes.max()) * 150 + 25
+            ax.scatter(
+                theta[mask.values], r[mask.values],
+                c=color, s=sizes, alpha=0.85,
+                label=f"{diff} ({mask.sum()})",
+                edgecolors="white", linewidths=0.5, zorder=5,
+            )
+    else:
+        # Plot objects by type (original mode)
+        for obj_type, color in TYPE_COLORS.items():
+            mask = plot_df['NormalizedType'] == obj_type
+            if not mask.any():
+                continue
+            sizes = plot_df.loc[mask, 'ApparentSizeAvg'].fillna(3).clip(lower=1)
+            sizes = (sizes / sizes.max()) * 150 + 25
+            ax.scatter(
+                theta[mask.values], r[mask.values],
+                c=color, s=sizes, alpha=0.85,
+                label=f"{obj_type} ({mask.sum()})",
+                edgecolors="white", linewidths=0.5, zorder=5,
+            )
  
         ax.scatter(
             theta[mask.values],
@@ -326,7 +421,6 @@ def display_polar_chart(analytics, profile):
     plt.close(fig)
  
     # Info metrics
-    mag_limit = analytics.aperture_mag_limit(aperture)
     col1, col2, col3 = st.columns(3)
     col1.metric("Objects Shown", len(plot_df))
     col2.metric("Telescope Limit", f"mag {mag_limit:.1f}")
@@ -348,6 +442,7 @@ def display_scatter_chart(analytics, profile):
     season = profile.get_preference("preferred_season") or "Spring"
     mag_col = analytics.columns['MAGNITUDE']
     name_col = analytics.columns['NAME']
+    mag_limit = analytics.aperture_mag_limit(aperture)
  
     col1, col2 = st.columns(2)
     with col1:
@@ -368,6 +463,11 @@ def display_scatter_chart(analytics, profile):
     if show_visible:
         visible = analytics.filter_by_aperture_and_brightness(aperture)
         df = df[df.index.isin(visible.index)]
+        if len(visible) == 110:
+            st.info(
+                f"All 110 Messier objects are visible with your {aperture:.0f}mm "
+                f"telescope. Try a smaller aperture to see the filter in action."
+            )
  
     plot_df = df.dropna(subset=['RA_Decimal', mag_col]).copy()
  
@@ -417,7 +517,6 @@ def display_scatter_chart(analytics, profile):
         ax.axvspan(0, ra_max, alpha=0.08, color="#1D9E75")
  
     # Magnitude limit line
-    mag_limit = analytics.aperture_mag_limit(aperture)
     ax.axhline(y=mag_limit, color="#D85A30", linestyle="--", alpha=0.5, linewidth=1)
     ax.text(0.5, mag_limit + 0.2, f"Telescope limit (mag {mag_limit:.1f})",
             fontsize=8, color="#D85A30", alpha=0.7)
@@ -815,6 +914,241 @@ def display_favorites(analytics, profile):
  
  
 # ──────────────────────────────────────────────
+# Observing Tour — Equipment-Based Custom Tours
+# ──────────────────────────────────────────────
+ 
+def generate_observing_tip(row, mag_col, aperture, mag_limit):
+    """Generate a short data-driven observing tip for a Messier object."""
+    mag = row.get(mag_col, None)
+    obj_type = row.get('NormalizedType', 'Unknown')
+    size_cat = row.get('SizeCategory', 'Unknown')
+    name = row.get('Name', 'This object')
+ 
+    tips = []
+ 
+    # Brightness-based tip
+    if mag and mag <= 3.0:
+        tips.append("Visible to the naked eye even in cities.")
+    elif mag and mag <= 5.0:
+        tips.append("Naked eye target under dark skies.")
+    elif mag and mag <= 8.5:
+        tips.append("Best with binoculars or a small scope.")
+    elif mag and mag <= mag_limit:
+        tips.append(f"Requires your telescope ({aperture:.0f}mm).")
+ 
+    # Size-based tip
+    if size_cat == "Very Large":
+        tips.append("Very large — use low magnification for the best view.")
+    elif size_cat == "Large":
+        tips.append("Large target — fits well in a wide-field eyepiece.")
+    elif size_cat == "Small":
+        tips.append("Compact — try higher magnification to see detail.")
+ 
+    # Type-based tip
+    if obj_type == "Galaxy":
+        tips.append("Look for a faint fuzzy glow. Averted vision helps.")
+    elif obj_type == "Nebula":
+        tips.append("A nebula filter can improve contrast significantly.")
+    elif obj_type == "Cluster":
+        tips.append("Star cluster — should resolve into individual stars.")
+ 
+    return " ".join(tips) if tips else "Point your telescope and enjoy the view!"
+ 
+ 
+def display_observing_tour(analytics, profile):
+    """
+    Generate a custom observing tour based on the user's equipment,
+    experience level, and preferred season. Pure data-driven — no LLM needed.
+    """
+    st.subheader("Your Observing Tour")
+ 
+    aperture = profile.get_preference("aperture_mm") or DEFAULT_APERTURE_MM
+    season = profile.get_preference("preferred_season") or "Spring"
+    level = profile.get_preference("experience_level") or "Beginner"
+    location = profile.get_preference("location") or "Unknown"
+    mag_col = analytics.columns['MAGNITUDE']
+    name_col = analytics.columns['NAME']
+    type_col = analytics.columns['TYPE']
+ 
+    mag_limit = analytics.aperture_mag_limit(aperture)
+    obs_log = load_observation_log()
+ 
+    st.markdown(
+        f"A custom tour for a **{level}** observer in **{location}** "
+        f"using a **{aperture:.0f}mm** telescope during **{season}**."
+    )
+ 
+    # Configure tour size and difficulty by experience level
+    if level == "Beginner":
+        tour_size = 8
+        # Beginners: brightest objects, skip anything near the limit
+        mag_ceiling = min(mag_limit, 8.5)
+        include_challenge = True
+        challenge_ceiling = min(mag_limit, 10.0)
+    elif level == "Intermediate":
+        tour_size = 12
+        mag_ceiling = min(mag_limit, 10.0)
+        include_challenge = True
+        challenge_ceiling = mag_limit
+    else:  # Advanced
+        tour_size = 16
+        mag_ceiling = mag_limit
+        include_challenge = True
+        challenge_ceiling = mag_limit
+ 
+    # Get seasonal objects visible with this telescope
+    seasonal_df = analytics.get_visible_in_season(season)
+    visible_df = analytics.filter_by_aperture_and_brightness(aperture)
+ 
+    # Intersection: seasonal AND visible
+    tour_df = seasonal_df[seasonal_df.index.isin(visible_df.index)].copy()
+ 
+    if tour_df.empty:
+        st.warning(
+            f"No objects found for {season} with a {aperture:.0f}mm telescope. "
+            "Try changing your season or aperture in the sidebar."
+        )
+        return
+ 
+    # Split into difficulty tiers
+    easy = tour_df[tour_df[mag_col] <= 5.0].sort_values(mag_col)
+    moderate = tour_df[
+        (tour_df[mag_col] > 5.0) & (tour_df[mag_col] <= mag_ceiling)
+    ].sort_values(mag_col)
+    challenging = tour_df[
+        (tour_df[mag_col] > mag_ceiling) & (tour_df[mag_col] <= challenge_ceiling)
+    ].sort_values(mag_col)
+ 
+    # Build the tour with a mix of difficulties
+    if level == "Beginner":
+        tour_objects = (
+            list(easy.index[:3]) +
+            list(moderate.index[:4]) +
+            (list(challenging.index[:1]) if include_challenge else [])
+        )
+    elif level == "Intermediate":
+        tour_objects = (
+            list(easy.index[:2]) +
+            list(moderate.index[:7]) +
+            list(challenging.index[:3])
+        )
+    else:
+        tour_objects = (
+            list(easy.index[:1]) +
+            list(moderate.index[:5]) +
+            list(challenging.index[:10])
+        )
+ 
+    tour_result = tour_df.loc[
+        [i for i in tour_objects if i in tour_df.index]
+    ].copy()
+ 
+    if tour_result.empty:
+        st.warning("Could not generate a tour with the current settings.")
+        return
+ 
+    # Tour progress
+    observed_in_tour = [
+        n for n in tour_result[name_col].values if n in obs_log
+    ]
+    progress = len(observed_in_tour) / len(tour_result) if len(tour_result) > 0 else 0
+    st.progress(
+        progress,
+        text=f"Tour progress: {len(observed_in_tour)} of {len(tour_result)} observed ({progress:.0%})"
+    )
+ 
+    # Display the tour
+    tour_num = 1
+    prev_tier = None
+ 
+    for idx, row in tour_result.iterrows():
+        mag = row.get(mag_col, None)
+        obj_name = row.get(name_col, "Unknown")
+        is_observed = obj_name in obs_log
+ 
+        # Determine tier
+        if mag and mag <= 5.0:
+            tier = "Start here — easiest targets"
+            tier_icon = "🟢"
+        elif mag and mag <= mag_ceiling:
+            tier = "Main targets"
+            tier_icon = "🔵"
+        else:
+            tier = "Challenge objects — push yourself!"
+            tier_icon = "🟠"
+ 
+        # Show tier header when it changes
+        if tier != prev_tier:
+            st.markdown(f"#### {tier_icon} {tier}")
+            prev_tier = tier
+ 
+        # Object card
+        observed_marker = " ✓ Observed" if is_observed else ""
+        obj_type = row.get('NormalizedType', 'Unknown')
+        constellation = row.get(analytics.columns.get('CONSTELLATION', ''), 'Unknown')
+        best_month = row.get('BestViewingMonth', 'Unknown')
+        color = TYPE_COLORS.get(obj_type, '#888780')
+ 
+        with st.expander(
+            f"**{tour_num}. {obj_name}** — {obj_type} | "
+            f"mag {mag:.1f} | {constellation}{observed_marker}"
+        ):
+            col1, col2 = st.columns([2, 1])
+ 
+            with col1:
+                # Observing tip
+                tip = generate_observing_tip(row, mag_col, aperture, mag_limit)
+                st.markdown(f"**Observing tip:** {tip}")
+                st.caption(f"Best viewing: {best_month} | Size: {row.get('SizeCategory', 'Unknown')}")
+ 
+                # Remarks from catalog
+                remarks = row.get(analytics.columns.get('REMARKS', ''), '')
+                if remarks and str(remarks).strip() and str(remarks) != 'nan':
+                    st.markdown(f"**Catalog notes:** {remarks}")
+ 
+            with col2:
+                # Quick action buttons
+                if not is_observed:
+                    if st.button("Mark Observed", key=f"tour_obs_{obj_name}"):
+                        obs_log[obj_name] = {
+                            "date": datetime.now().strftime("%Y-%m-%d"),
+                            "notes": f"Observed during {season} tour",
+                        }
+                        save_observation_log()
+                        st.rerun()
+                else:
+                    st.success(f"Observed {obs_log[obj_name].get('date', '')}")
+ 
+                favorites = profile.get_favorites()
+                if obj_name not in favorites:
+                    if st.button("Add Favorite", key=f"tour_fav_{obj_name}"):
+                        profile.add_favorite(obj_name)
+                        profile.save_profile()
+                        st.rerun()
+ 
+        tour_num += 1
+ 
+    # Tour summary
+    st.divider()
+    st.markdown("#### Tour Summary")
+    col1, col2, col3, col4 = st.columns(4)
+    col1.metric("Total Objects", len(tour_result))
+    col2.metric("Observed", len(observed_in_tour))
+    col3.metric("Remaining", len(tour_result) - len(observed_in_tour))
+ 
+    type_counts = tour_result['NormalizedType'].value_counts()
+    type_summary = ", ".join([f"{count} {t}" for t, count in type_counts.items()])
+    col4.metric("Mix", type_summary)
+ 
+    # Variety check
+    types_in_tour = tour_result['NormalizedType'].nunique()
+    if types_in_tour >= 3:
+        st.success("Great variety! Your tour includes galaxies, nebulae, and clusters.")
+    elif types_in_tour >= 2:
+        st.info("Good mix of object types in your tour.")
+ 
+ 
+# ──────────────────────────────────────────────
 # Chat Interface (placeholder for LLM tools)
 # ──────────────────────────────────────────────
  
@@ -852,6 +1186,14 @@ def main():
     st.title("Messier Object Tourist Guide")
     st.caption("Your personalized deep-sky observing companion")
  
+    with st.expander("Setting up your profile"):
+        st.markdown(
+            "This step is not super important, but if you want a more personalized "
+            "star map, you can change your name, telescope aperture, experience level, "
+            "and preferred season! If you do not have a telescope, these steps are not "
+            "necessary to run this guide."
+        )
+ 
     # Load data and profile
     analytics = load_messier_data()
     profile = get_user_profile()
@@ -860,22 +1202,45 @@ def main():
     profile = render_sidebar(profile, analytics)
  
     # Main content tabs
-    tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs([
+    tab1, tab2, tab3, tab4, tab5, tab6, tab7 = st.tabs([
         "Sky Chart",
         "Finder Chart",
         "Object Details",
         "Catalog Explorer",
+        "Observing Tour",
         "Observation Log",
         "Observing Assistant",
     ])
  
     with tab1:
+        with st.expander("About this tab"):
+            st.markdown(
+                "You can play around with this circular plot of the Messier objects. "
+                "Depending on your preferred season, you can choose to show only the "
+                "objects for that season. Depending on your telescope, you will see "
+                "which objects are visible. Last but not least! You can choose to view "
+                "the plot by object type or viewing difficulty. The position will not "
+                "change; only the key describing the points will."
+            )
         display_polar_chart(analytics, profile)
  
     with tab2:
+        with st.expander("About this tab"):
+            st.markdown(
+                "Instead of a circular plot, this is a more traditional viewing of the "
+                "objects by their Right Ascension and their magnitude. The Finder Chart "
+                "is better at visualizing the magnitudes vs the RA values at a glance."
+            )
         display_scatter_chart(analytics, profile)
  
     with tab3:
+        with st.expander("About this tab"):
+            st.markdown(
+                "You may select any object of your choosing to find info about its "
+                "magnitude, best month for viewing from your specified location, and "
+                "apparent angular size! There are a few extra notes outlining the "
+                "position in the sky and other tools."
+            )
         col1, col2 = st.columns([1, 1])
         with col1:
             display_object_details(analytics, profile)
@@ -883,12 +1248,35 @@ def main():
             display_favorites(analytics, profile)
  
     with tab4:
+        with st.expander("About this tab"):
+            st.markdown(
+                "The Catalog is a full table of all 110 objects, if combing through "
+                "1 by 1 is too much. You can filter this table by its type, max "
+                "magnitude, and season. The table shows a few facts about objects "
+                "similar to those in the Object Details section."
+            )
         display_object_table(analytics, profile)
  
     with tab5:
-        display_observation_log(analytics, profile)
+        with st.expander("About this tab"):
+            st.markdown(
+                "You have access to a custom observing plan for that night based on "
+                "the sidebar settings in your profile. Beginners have 8 objects, while "
+                "advanced observers have 16, with harder targets to find."
+            )
+        display_observing_tour(analytics, profile)
  
     with tab6:
+        with st.expander("About this tab"):
+            st.markdown(
+                "Similar to the Observing Tour, you can track objects that you want "
+                "to observe. However, the structure of the Tour is not there. It is "
+                "a marathon tracker; you add your observations and any notes on the "
+                "objects until you have all 110."
+            )
+        display_observation_log(analytics, profile)
+ 
+    with tab7:
         chat_interface()
  
  

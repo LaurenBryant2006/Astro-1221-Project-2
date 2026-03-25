@@ -11,6 +11,7 @@
 
 # Project Goal:
 To collect information about all the Messier objects, filter it, and, depending on the input of the aperture and other info of the user (observer), such as the season of the year, display information to present the messier objects and take them on a tour through the objects.
+See requirements.txt for more information on class architecture and other file structure information.
 
 # Data Sources:
 -Please see the constants.py file to see the sources and where they are referenced. 

@@ -16,6 +16,7 @@ env/
 *.csv
 *log.txt
 *aperture.txt
+.env
 
 # Streamlit specific ignores
 .streamlit/secrets.toml

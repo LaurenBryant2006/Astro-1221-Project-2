@@ -42,6 +42,9 @@ from user_profile import UserProfile, VALID_EXPERIENCE_LEVELS, VALID_SEASONS
 from constants import DEFAULT_APERTURE_MM, SEASON_RA
 from astro_llm_tools import AstroLLMTools
  
+## This is the driver behind the streamlit code! All of our other files help support this massive chunk of code
+## we will go through the chunks piece by piece explaining why they are there and what they do 
+
 # ──────────────────────────────────────────────
 # Constants
 # ──────────────────────────────────────────────
@@ -55,14 +58,16 @@ TYPE_COLORS = {
     "Other": "#888780",
 }
  
- 
+ ## The code creates a JSON file when the user logs their first observation! Its where we save observed objects
+ ## And pretty simply, we categorized the different types with a color to see better
+
 # ──────────────────────────────────────────────
 # Data Loading (cached so it only runs once)
 # ──────────────────────────────────────────────
 
 @st.cache_data
 def load_messier_data():
-    """Download, parse, and clean the Messier catalog. Cached across reruns."""
+
     ingester = MessierDataIngester()
     csv_path = ingester.fetch_and_save()
     objects = ingester.parse_messier_objects_to_dict(csv_path)
@@ -70,9 +75,13 @@ def load_messier_data():
     analytics.clean_data()
     return analytics
  
+ ## This function pulls from files messier_data_ingester.py and astro_analytics_engine.py  
+ ## This creates an ingester, it downlaods the Messier catalog form the internet and parses it into one list of dictionaries 
+ ##It then runs these dictionaries through a Pandas DataFrame and cleans it! Turns certain values into others that the code can better use
+ ## the st.cache data functions tells streamlit to only run this code once it wont redownload the catalog everytime
  
 def get_user_profile():
-    """Load or initialize user profile in session state."""
+
     if "profile" not in st.session_state:
         st.session_state.profile = UserProfile()
     return st.session_state.profile
@@ -80,13 +89,21 @@ def get_user_profile():
 def get_llm_tools():
     return AstroLLMTools()
 astro_ai = get_llm_tools()
+
+## The user profile funtion pulls from the userprofile.py, it uses the certain charactersic like name, season preference, etc in the file to complete the profile
+## if there is not a profile in the "session" or rather the open tab, it will create a new slate user profile. If one already exists then it will use that one (so if you already run the code and saved your profile it would still be there)
+## Everytime anything happens in the streamlit the entire code gets rerun, without this funtion any changes made would lose all of the progress
+## using the st.cache resources we can keep the profile from moving when changes are made
+
+##The get llm tools function pulls from the file astro llm tools 
+## In that code there is an AstroLLMTools fucntion which we are recalling in this code to create the get observing story and generate observing plan function in streamlit
  
 # ──────────────────────────────────────────────
 # Observation Log — Persistence
 # ──────────────────────────────────────────────
  
 def load_observation_log():
-    """Load the observation log from disk into session state."""
+
     if "obs_log" not in st.session_state:
         if os.path.exists(OBSERVATION_LOG_FILE):
             try:
@@ -100,20 +117,29 @@ def load_observation_log():
  
  
 def save_observation_log():
-    """Save the current observation log to disk."""
+
     try:
         with open(OBSERVATION_LOG_FILE, "w", encoding="utf-8") as f:
             json.dump(st.session_state.obs_log, f, indent=2)
     except IOError as e:
         st.error(f"Could not save observation log: {e}")
  
- 
+ ## Our load_obseravtion_log code checks if an observation log already exists, if one doesnt it tries to pull from observation_log.json
+ ## And if all else fails it will simply create a new log with an empty dictionary
+ ## Again this is just precaution that streamlit doesnt run the code again every time a change is made and lose all of the edits made in the app
+ ## st.cache and st.session state are similar commands: st.cache tells stremalit to only run the function once and save that result. st.session state tells it to keep the same variable and not rerun it but the user can change it
+ ## in short, cache = run once with no changes, session state = create one, update when needed 
+
+ ## The save_observation_log takes the current observation log from the session writes it to observation_log.json
+ ## This command is called every time a user logs, edits, or removes an observation
+ ## so like previosly mentioned, st.session_state makes sure its only created once but we change if needed (and this is where that change happens)
+
 # ──────────────────────────────────────────────
 # Sidebar — User Profile Settings
 # ──────────────────────────────────────────────
  
 def render_sidebar(profile, analytics):
-    """Display and manage user profile settings in the sidebar."""
+
     st.sidebar.title("Observer Profile")
  
     # Name
@@ -224,29 +250,34 @@ def render_sidebar(profile, analytics):
  
     return profile
  
- 
+ ## This fucntion pulls from quite a few files including user_profile, astro_analytics_engine, and constants
+ ## This is all code to edit the actual lay out of streamlit, the st. tells us that this is streamlit
+ ## We build the sidebar with inputs for name, location, aperture, experience level, and season
+ ## Each input update the profile_prefernces so it stays that way unless the user decided to reset data which is also seen the final block of code
+ ## all the other tabs in streamlit rely on the data saved in the profile so it is important the it doesnt change between clicks
+
 # ──────────────────────────────────────────────
 # Polar Sky Chart
 # ──────────────────────────────────────────────
  
 def display_polar_chart(analytics, profile):
-    """
-    Circular sky chart showing Messier objects plotted by Right Ascension
-    (angle) and Magnitude (radius). Mimics an all-sky view where brighter
-    objects are closer to the center.
-    """
+
     st.subheader("Sky Chart")
     st.caption(
         "A polar view of all Messier objects. Angle = Right Ascension, "
         "distance from center = magnitude (brighter objects are closer to center)."
     )
- 
+
+    ## this one is a little long so I will be cutting up the commentary, but this first bit of code is not necessary I just thought it would be nice to have a bried description of the tab
+    ## we pull from files astro_analytics_engine (get all objects, get visible in season and filter by aperture and brightness), user_profile (for its get prefernces command), and constants (for the season right acensions) again 
     aperture = profile.get_preference("aperture_mm") or DEFAULT_APERTURE_MM
     season = profile.get_preference("preferred_season") or "Spring"
     mag_col = analytics.columns['MAGNITUDE']
     name_col = analytics.columns['NAME']
     mag_limit = analytics.aperture_mag_limit(aperture)
  
+ ## we need to pull all the inputs that the user made in the profile into the sidebar so that we can create a more personalized sky map
+
     # Filter controls
     col1, col2, col3 = st.columns(3)
     with col1:
@@ -263,7 +294,8 @@ def display_polar_chart(analytics, profile):
         show_visible_only = st.checkbox(
             "Show only visible with my telescope", value=False, key="polar_visible"
         )
- 
+       ## This create the three controls at the top of the sky map, the only real difference in the code here is that we created checked boxes for 1 and 3 and a selecter for 2
+       
     df = analytics.get_all_objects().copy()
  
     if show_season_only:
@@ -286,6 +318,9 @@ def display_polar_chart(analytics, profile):
     if plot_df.empty:
         st.warning("No objects match the current filters.")
         return
+
+## if the controls we created eailer are clicked or change, this code will display what the controls are doing
+## so if show season only is clicked than the sky map will display only the part of sky you can see during that season
  
     # Convert RA hours (0-24) to radians (0 to 2*pi)
     theta = plot_df['RA_Decimal'].values * (2 * np.pi / 24)
@@ -328,6 +363,8 @@ def display_polar_chart(analytics, profile):
         "Telescope": "#7F77DD",
         "Challenging": "#D85A30",
     }
+
+    ## In short, we created a circular Matplotlib plot using polar projection, each object is a dot where the angle around the circle is the object's Right Ascension and the distance from the center is the mag
  
     def get_difficulty(mag_val):
         if mag_val <= 5.0:
@@ -353,6 +390,10 @@ def display_polar_chart(analytics, profile):
                 label=f"{diff} ({mask.sum()})",
                 edgecolors="white", linewidths=0.5, zorder=5,
             )
+
+        ## Inside of the display_polar_chart function we have a function that runs if the users chooses to view the skymap by the object's difficulty to see
+        ## It takes magnitudes and sets intervals for them and assigns the intervals to a certain difficulty 
+
     else:
         # Plot objects by type (original mode)
         for obj_type, color in TYPE_COLORS.items():
@@ -393,7 +434,9 @@ def display_polar_chart(analytics, profile):
             color="white",
             alpha=0.8,
         )
- 
+    
+    ##
+
     # Configure polar axes
     ax.set_theta_zero_location("N")
     ax.set_theta_direction(-1)
@@ -429,8 +472,10 @@ def display_polar_chart(analytics, profile):
     col2.metric("Telescope Limit", f"mag {mag_limit:.1f}")
     col3.metric(f"{season} Season", f"{len(analytics.get_visible_in_season(season))} objects")
  
- 
-# ──────────────────────────────────────────────
+## 
+## 
+
+# # ──────────────────────────────────────────────
 # Scatter Finder Chart
 # ──────────────────────────────────────────────
  
@@ -756,7 +801,7 @@ def display_object_table(analytics, profile):
 # ──────────────────────────────────────────────
  
 def display_observation_log(analytics, profile):
-    """Track which Messier objects the user has observed, with dates and notes."""
+
     st.subheader("Observation Log")
  
     name_col = analytics.columns['NAME']
@@ -868,7 +913,7 @@ def display_observation_log(analytics, profile):
 # ──────────────────────────────────────────────
  
 def display_favorites(analytics, profile):
-    """Manage and display favorite Messier objects."""
+
     st.subheader("Favorites")
  
     name_col = analytics.columns['NAME']
@@ -928,7 +973,7 @@ def display_favorites(analytics, profile):
 # ──────────────────────────────────────────────
  
 def generate_observing_tip(row, mag_col, aperture, mag_limit):
-    """Generate a short data-driven observing tip for a Messier object."""
+
     mag = row.get(mag_col, None)
     obj_type = row.get('NormalizedType', 'Unknown')
     size_cat = row.get('SizeCategory', 'Unknown')
@@ -966,10 +1011,7 @@ def generate_observing_tip(row, mag_col, aperture, mag_limit):
  
  
 def display_observing_tour(analytics, profile):
-    """
-    Generate a custom observing tour based on the user's equipment,
-    experience level, and preferred season. Pure data-driven — no LLM needed.
-    """
+
     st.subheader("Your Observing Tour")
  
     aperture = profile.get_preference("aperture_mm") or DEFAULT_APERTURE_MM
@@ -1183,10 +1225,7 @@ def chat_interface(profile):
 # ──────────────────────────────────────────────
 
 class AstroStreamlitUI:
-    """
-    Streamlit UI wrapper for the Messier Object Tourist Guide app.
-    Call run() to launch the UI in a Streamlit context.
-    """
+
     def __init__(self):
         pass
 
